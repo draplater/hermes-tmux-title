@@ -3,7 +3,7 @@
 Hooks:
 - on_session_title: store current title, update tmux
 - pre_llm_call:      set busy emoji (🔄)
-- post_llm_call:     set done emoji (🔔)
+- post_llm_call:     set done emoji (🛎️)
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ def _update_tmux() -> None:
     pane = os.getenv("TMUX_PANE")
     if not pane:
         return
-    emoji = "🔄" if _busy else "🔔"
+    emoji = "🔄" if _busy else "🛎️"
     label = f"{emoji} {_title}"
     try:
         subprocess.run(
