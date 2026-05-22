@@ -6,11 +6,13 @@ Hooks:
 - post_llm_call:          set done emoji (🛎️)
 - pre_approval_request:   set alarm emoji (🚨), waiting for user
 - post_approval_response: restore to previous state
-- on_session_end:         restore original tmux window name
+
+On process exit (atexit): restore original tmux window name.
 """
 
 from __future__ import annotations
 
+import atexit
 import logging
 import os
 import subprocess
@@ -21,6 +23,7 @@ _title: str = "Hermes"
 _busy: bool = False
 _awaiting_approval: bool = False
 _original_name: str | None = None
+_atexit_registered: bool = False
 
 
 def _tmux_get_window_name() -> str | None:
@@ -56,10 +59,19 @@ def _tmux_rename(label: str) -> None:
 
 
 def _ensure_original_name() -> None:
-    """Lazy-init: capture the window name before we first touch it."""
-    global _original_name
+    """Lazy-init: capture window name and register atexit once."""
+    global _original_name, _atexit_registered
     if _original_name is None:
         _original_name = _tmux_get_window_name() or ""
+    if not _atexit_registered:
+        atexit.register(_restore_tmux)
+        _atexit_registered = True
+
+
+def _restore_tmux() -> None:
+    """Restore original tmux window name (called by atexit)."""
+    if _original_name:
+        _tmux_rename(_original_name)
 
 
 def _update_tmux() -> None:
@@ -105,16 +117,9 @@ def _on_post_approval_response(choice: str, **kwargs) -> None:
     _update_tmux()
 
 
-def _on_session_end(session_id: str, **kwargs) -> None:
-    """Restore the original tmux window name on exit."""
-    if _original_name:
-        _tmux_rename(_original_name)
-
-
 def register(ctx) -> None:
     ctx.register_hook("on_session_title", _on_session_title)
     ctx.register_hook("pre_llm_call", _on_pre_llm_call)
     ctx.register_hook("post_llm_call", _on_post_llm_call)
     ctx.register_hook("pre_approval_request", _on_pre_approval_request)
     ctx.register_hook("post_approval_response", _on_post_approval_response)
-    ctx.register_hook("on_session_end", _on_session_end)
