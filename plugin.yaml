@@ -1,0 +1,6 @@
+name: tmux-title
+version: 1.0.0
+description: "Sync Hermes session title to the tmux window name. Uses $TMUX_PANE to target the correct window even when the user switches tabs."
+author: "draplater"
+hooks:
+  - on_session_title
