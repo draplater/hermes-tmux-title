@@ -6,10 +6,10 @@ Sync Hermes session title and status to the tmux window name.
 
 | Hermes state | tmux tab shows |
 |-------------|---------------|
-| Fresh session | `🔔 Hermes` |
+| Fresh session | `🛎️ Hermes` |
 | Processing (LLM call) | `🔄 Shopping cart debug` |
-| Done, waiting for input | `🔔 Shopping cart debug` |
-| Title changed (/title) | `🔄` or `🔔` persists, title updates |
+| Done, waiting for input | `🛎️ Shopping cart debug` |
+| Title changed (/title) | `🔄` or `🛎️` persists, title updates |
 
 Uses `$TMUX_PANE` to target the correct window even when the user switches tabs.
 
