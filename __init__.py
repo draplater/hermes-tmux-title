@@ -2,10 +2,10 @@
 
 Hooks:
 - on_session_title:       store current title, update tmux
-- pre_llm_call:           set busy emoji (🔄)
-- post_llm_call:          set done emoji (🛎️)
-- pre_approval_request:   set alarm emoji (🚨), waiting for user
-- post_approval_response: restore to previous state
+- pre_llm_call / pre_tool_call:      → 🔄 busy
+- post_llm_call / post_tool_call:    → 🛎️ idle
+- pre_approval_request:              → 🚨 waiting for user
+- post_approval_response:            → restore busy/idle
 
 On process exit (atexit): restore original tmux window name.
 """
@@ -27,16 +27,13 @@ _atexit_registered: bool = False
 
 
 def _tmux_get_window_name() -> str | None:
-    """Get current tmux window name for this pane."""
     pane = os.getenv("TMUX_PANE")
     if not pane:
         return None
     try:
         r = subprocess.run(
             ["tmux", "display-message", "-t", pane, "-p", "#{window_name}"],
-            timeout=2,
-            capture_output=True,
-            text=True,
+            timeout=2, capture_output=True, text=True,
         )
         return r.stdout.strip() or None
     except Exception:
@@ -44,22 +41,19 @@ def _tmux_get_window_name() -> str | None:
 
 
 def _tmux_rename(label: str) -> None:
-    """Rename the tmux window for this pane."""
     pane = os.getenv("TMUX_PANE")
     if not pane:
         return
     try:
         subprocess.run(
             ["tmux", "rename-window", "-t", pane, label],
-            timeout=3,
-            capture_output=True,
+            timeout=3, capture_output=True,
         )
     except Exception:
         pass
 
 
 def _ensure_original_name() -> None:
-    """Lazy-init: capture window name and register atexit once."""
     global _original_name, _atexit_registered
     if _original_name is None:
         _original_name = _tmux_get_window_name() or ""
@@ -69,20 +63,18 @@ def _ensure_original_name() -> None:
 
 
 def _restore_tmux() -> None:
-    """Restore original tmux window name (called by atexit)."""
     if _original_name:
         _tmux_rename(_original_name)
 
 
 def _update_tmux() -> None:
-    """Compose emoji + title and rename the tmux window."""
     _ensure_original_name()
     if _awaiting_approval:
-        emoji = "🚨"
+        emoji = "\U0001f6a8"       # 🚨
     elif _busy:
-        emoji = "🔄"
+        emoji = "\U0001f504"       # 🔄
     else:
-        emoji = "🛎️"
+        emoji = "\U0001f6ce\ufe0f"  # 🛎️
     _tmux_rename(f"{emoji} {_title}")
 
 
@@ -99,6 +91,18 @@ def _on_pre_llm_call(**kwargs) -> None:
 
 
 def _on_post_llm_call(**kwargs) -> None:
+    global _busy
+    _busy = False
+    _update_tmux()
+
+
+def _on_pre_tool_call(**kwargs) -> None:
+    global _busy
+    _busy = True
+    _update_tmux()
+
+
+def _on_post_tool_call(**kwargs) -> None:
     global _busy
     _busy = False
     _update_tmux()
@@ -121,5 +125,7 @@ def register(ctx) -> None:
     ctx.register_hook("on_session_title", _on_session_title)
     ctx.register_hook("pre_llm_call", _on_pre_llm_call)
     ctx.register_hook("post_llm_call", _on_post_llm_call)
+    ctx.register_hook("pre_tool_call", _on_pre_tool_call)
+    ctx.register_hook("post_tool_call", _on_post_tool_call)
     ctx.register_hook("pre_approval_request", _on_pre_approval_request)
     ctx.register_hook("post_approval_response", _on_post_approval_response)
